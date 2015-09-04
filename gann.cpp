@@ -245,11 +245,7 @@ protected:
 public:
 
 	// Construtor
-	network(int nL, ...);
-	network(int nL, va_list ap);
-	
-	// Initializer
-	void init(int nL, va_list ap);
+	network(int nL, int *nPL);
 	
 	// Input	
 	virtual void *getInputData(void) = 0;
@@ -271,24 +267,13 @@ public:
 	void setGenome(double* g);
 };
 
-network::network(int nL, ...) {
-	va_list ap;
-	va_start(ap, nL);
-	init(nL,ap);
-	va_end(ap);
-}
-
-network::network(int nL, va_list ap) {
-	init(nL,ap);
-}
-
-void network::init(int nL, va_list ap) {
+network::network(int nL, int *nPL) {
 	genomeSz = 0;
 	nLayers = nL;
 	nPerLayer = (int*) malloc(sizeof(int)*nLayers);
 	// Apply the number per layers
 	for(int i = 0; i<nLayers; i++) {
-		nPerLayer[i] = va_arg(ap,int);
+		nPerLayer[i] = nPL[i];
 	}
 	// Allocate space for layers 
 	neurons = (neuron***) malloc(sizeof(neuron**)*nLayers);
@@ -380,6 +365,7 @@ void network::setGenome(double* g) {
 
 //====================================================
 
+
 class booleanOperation: public network {
 protected:
 	int a;
@@ -393,8 +379,7 @@ protected:
 		int b;
 	} coupleData;
 public:
-	booleanOperation(int iSz, int nLayer, ...);
-	booleanOperation(int iSz, int nLayer, va_list ap);
+	booleanOperation(int iSz, int nLayer, int *nPerLayer);
 	void init(int iSz);
 	virtual void *getInputData(void);
 	virtual void setInputData(void*);
@@ -406,15 +391,7 @@ public:
 	virtual double error(double res) = 0;
 };
 
-booleanOperation::booleanOperation(int iSz, int nLayer, ...): network(nLayer, ...) {
-	init(iSz);
-}
-
-booleanOperation::booleanOperation(int iSz, int nLayer, va_list ap): network(nLayer, ap) {
-	init(iSz);
-}
-
-void booleanOperation::init(int iSz) {
+booleanOperation::booleanOperation(int iSz, int nLayer, int *nPerLayer): network(nLayer, nPerLayer) {
 	nInput = 2;
 	intSz = iSz;
 	mask = 0;
@@ -488,11 +465,11 @@ int booleanOperation::getB(void){
 
 class AsupB: public booleanOperation {
 public:
-	AsupB();
+	AsupB(int iSz, int nLayer, int *nPerLayer);
 	virtual double error(double res);
 };
 
-AsupB::AsupB(): booleanOperation(4,3,4,5,1) { }
+AsupB::AsupB(int iSz, int nLayer, int *nPerLayer): booleanOperation(iSz,nLayer,nPerLayer) { }
 
 double AsupB::error(double res) {
 	
@@ -541,11 +518,11 @@ double AsupB::error(double res) {
 
 class AandB: public booleanOperation {
 public:
-	AandB();
+	AandB(int nLayer, int *nPerLayer);
 	virtual double error(double res);
 };
 
-AandB::AandB(): booleanOperation(1,3,2,2,1) { }
+AandB::AandB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer) { }
 
 double AandB::error(double res) {
 	int result = a & b;
@@ -1080,26 +1057,34 @@ int main(int argc, char* argv[]) {
 #else
 
 #if defined(AANDB)
+
+	// Create topology
+	int topo[3] = {4,2,1};
+	
 	// Networks alloc
 	AandB **n = (AandB**) malloc(sizeof(AandB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		n[i] = new AandB();
+		n[i] = new AandB(3,topo);
 	}
 	
 	AandB **cn = (AandB**) malloc(sizeof(AandB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		cn[i] = new AandB();
+		cn[i] = new AandB(3,topo);
 	}
 #elif defined (ASUPB)
+
+	// Create topology
+	int topo[3] = {4,2,1};
+	
 	// Networks alloc
 	AsupB **n = (AsupB**) malloc(sizeof(AsupB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		n[i] = new AsupB();
+		n[i] = new AsupB(4,3,topo);
 	}
 	
 	AsupB **cn = (AsupB**) malloc(sizeof(AsupB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		cn[i] = new AsupB();
+		cn[i] = new AsupB(4,3,topo);
 	}
 #endif
 
