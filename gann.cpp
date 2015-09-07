@@ -26,8 +26,6 @@
 #include <stdarg.h>
 
 //#define BIASWHEEL_STATS
-//#define AANDB
-#define ASUPB
 
 double f[5];
 
@@ -526,7 +524,7 @@ AandB::AandB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer) {
 
 double AandB::error(double res) {
 	int result = a & b;
-	/*
+	
 	if(result == 1){
 		if(res>=0.5)
 			return 0.0;
@@ -538,7 +536,8 @@ double AandB::error(double res) {
 		else
 			return 1.0;
 	}
-	*/
+
+	/*
 	//printf("%d %d - %d ",a,b,result);
 	if(result == 1){
 		//printf("- %f\n",result - res);
@@ -546,6 +545,59 @@ double AandB::error(double res) {
 	} else {
 		//printf("- %f\n",res);
 		return res;
+	}
+	*/
+}
+
+//====================================================
+
+class AorB: public booleanOperation {
+public:
+	AorB(int nLayer, int *nPerLayer);
+	virtual double error(double res);
+};
+
+AorB::AorB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer) { }
+
+double AorB::error(double res) {
+	int result = a | b;
+	
+	if(result == 1){
+		if(res>=0.5)
+			return 0.0;
+		else
+			return 1.0;
+	} else {
+		if(res<0.5)
+			return 0.0;
+		else
+			return 1.0;
+	}
+
+}
+
+//====================================================
+
+class AequalB: public booleanOperation {
+public:
+	AequalB(int nLayer, int *nPerLayer);
+	virtual double error(double res);
+};
+
+AequalB::AequalB(int nLayer, int *nPerLayer): booleanOperation(4,nLayer,nPerLayer) { }
+
+double AequalB::error(double res) {
+	
+	if(a == b){
+		//printf("Equal\n");
+		if((res<=0.6) && (res >= 0.4)) {
+			//printf("Yeah\n");
+			return 0.0;
+		} else { 
+			return 1.0;
+		}
+	} else {
+		return 1.0;
 	}
 }
 
@@ -1056,6 +1108,11 @@ int main(int argc, char* argv[]) {
 	biasWheelTest();
 #else
 
+//#define AANDB
+//#define AORB
+//#define ASUPB
+#define AEQUALB
+
 #if defined(AANDB)
 
 	// Create topology
@@ -1074,30 +1131,61 @@ int main(int argc, char* argv[]) {
 #elif defined (ASUPB)
 
 	// Create topology
-	int topo[3] = {4,2,1};
+	int topo[2] = {4,1};
 	
 	// Networks alloc
 	AsupB **n = (AsupB**) malloc(sizeof(AsupB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		n[i] = new AsupB(4,3,topo);
+		n[i] = new AsupB(4,2,topo);
 	}
 	
 	AsupB **cn = (AsupB**) malloc(sizeof(AsupB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		cn[i] = new AsupB(4,3,topo);
+		cn[i] = new AsupB(4,2,topo);
 	}
+#elif defined (AORB)
+	#warning "AORB"
+	// Create topology
+	int topo[2] = {4,1};
+	
+	// Networks alloc
+	AorB **n = (AorB**) malloc(sizeof(AorB*)*nNetworks);
+	for(int i = 0; i<nNetworks; i++) {
+		n[i] = new AorB(2,topo);
+	}
+	
+	AorB **cn = (AorB**) malloc(sizeof(AorB*)*nNetworks);
+	for(int i = 0; i<nNetworks; i++) {
+		cn[i] = new AorB(2,topo);
+	}
+#elif defined (AEQUALB)
+
+	#warning "EQUALB"
+	// Create topology
+	int topo[3] = {4,2,1};
+	
+	// Networks alloc
+	AequalB **n = (AequalB**) malloc(sizeof(AequalB*)*nNetworks);
+	for(int i = 0; i<nNetworks; i++) {
+		n[i] = new AequalB(2,topo);
+	}
+	
+	AequalB **cn = (AequalB**) malloc(sizeof(AequalB*)*nNetworks);
+	for(int i = 0; i<nNetworks; i++) {
+		cn[i] = new AequalB(2,topo);
+	}
+	
 #endif
 
-	n[0]->extractGenome(true);
-	
 	genetics gen = genetics(nNetworks,(network**)n,(network**)cn);
-	for(int i = 0; i<1000; i++) {
+	bool running = true;
+	while(running) {
 		gen.compete(competition);		
 		gen.sort();
 		gen.select(chunk,nbiaisWheel,mutFactor,crossOverFactor);
 		double err[5];
 		//n[0]->extractGenome(true);
-		for(int i = 0 ; i<20; i++) {
+		for(int i = 0 ; i<200; i++) {
 			void *data = n[0]->getInputData();
 			n[0]->setInputData(data);
 			n[0]->step();
@@ -1105,8 +1193,12 @@ int main(int argc, char* argv[]) {
 			double e = n[0]->error(err[0]);
 			printf("%03d %03d %1.5f %1.5f\n",((booleanOperation*)n[0])->getA(),((booleanOperation*)n[0])->getB(),err[0],e);
 			free(data);
-		}	
+			if(e == 0.0)
+				running = false;
+		}
 	}
+	
+	n[0]->extractGenome(true);
 	
 #endif
 	return 0;
