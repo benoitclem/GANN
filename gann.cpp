@@ -54,7 +54,7 @@ RandomList::~RandomList() {
 }
 
 double RandomList::RandAB(double a, double b) {
-    return ( rand()/(double)RAND_MAX ) * (b-a) + a;
+	return ( rand()/(double)RAND_MAX ) * (b-a) + a;
 }
 
 int* RandomList::GetMixedArray(void) {
@@ -351,6 +351,8 @@ void network::insertNewNeuron(void) {
 	
 	nPerLayer[targetLayer]++;
 }
+
+
 
 void network::step(void) {
 	for(int i = 0; i<nLayers; i++) {
@@ -787,6 +789,7 @@ public:
 	genetics(int nNets, network **networks, network **childnetworks);		
 	void compete(int its);		
 	void select(int chunk, int nbiasWheel, double mutFactor = 0.001, double crossOverFactor = 0.7, int nCpy = 10);
+	void lovemaking(network *mom, network *dad, network *daughter, network *son, double mutFactor, double crossOverFactor);
 	void sort(void);
 	void step(void);
 	void print(void);
@@ -948,69 +951,7 @@ void genetics::select(int chunk, int nBiasWheel, double mutFactor, double crossO
 			selectionProb[c.iA] = c.pA;
 			selectionProb[c.iB] = c.pB;
 #endif
-	
-			double *genMom = mom->extractGenome(false);
-			int genMomSz = mom->genomeSize();
-			double *genDad = dad->extractGenome(false);
-			int genDadSz = dad->genomeSize();
-
-			if(genMomSz != genDadSz) {
-				int d = 0;
-				printf("This genetics don't gonna work");
-				d = 1/d;
-			}
-	
-			double *genChildOne = (double*) malloc (sizeof(double)*genMomSz);
-			double *genChildTwo = (double*) malloc (sizeof(double)*genMomSz);
-			
-			double crossProb = RandomList::RandAB(0,1);
-			if(crossProb >= crossOverFactor) {
-				int margeIn = 1;
-				int cutPlace = (int) RandomList::RandAB(margeIn,genMomSz-margeIn);
-	
-				//printf("[%d] Cutting place %d\n",it,cutPlace);
-				for(int i = 0; i<genMomSz; i++){
-					if(i<cutPlace) {
-						genChildOne[i] = genMom[i];
-						genChildTwo[i] = genDad[i];
-					} else {
-						genChildOne[i] = genDad[i];
-						genChildTwo[i] = genMom[i];
-					}
-					//printf("Child [%d], %f\n",i,genChild[i]);
-				}
-			
-				// Mutate
-				for(int i = 0; i< genMomSz; i++){
-					double mutationProb = RandomList::RandAB(0,1);
-					if(mutationProb <= mutFactor) {
-						//genChildOne[i] = 1-genChildOne[i];
-						genChildOne[i] = (double)rand()/(double)(RAND_MAX/2.0)-1.0;
-						//printf("%d - prob %f - Applying new weight %1.5f\n",i,mutationProb,genChildOne[i]);
-					}
-					mutationProb = RandomList::RandAB(0,1);
-					if(mutationProb <= mutFactor) {
-						//genChildTwo[i] = 1-genChildTwo[i];
-						genChildTwo[i] = (double)rand()/(double)(RAND_MAX/2.0)-1.0;
-						//printf("%d - prob %f - Applying new weight %1.5f\n",i,mutationProb,genChildTwo[i]);
-					}
-				}
-				
-			} else {
-				// When no crossover copy mom and dad genome into childs
-				for(int i = 0; i<genMomSz; i++){
-					genChildOne[i] = genMom[i];
-					genChildTwo[i] = genDad[i];
-				}
-			}
-			
-			childNets[it+k]->setGenome(genChildOne);
-			childNets[it+k+1]->setGenome(genChildTwo);
-
-			free(genChildOne);
-			free(genChildTwo);
-			free(genMom);
-			free(genDad);
+			lovemaking(mom, dad, childNets[it+k], childNets[it+k+1], mutFactor, crossOverFactor);
 		}
 		
 		// TODO Copy the N best elements into child population
@@ -1046,6 +987,71 @@ void genetics::select(int chunk, int nBiasWheel, double mutFactor, double crossO
 		delete(bw);
 		delete(rl);
 	}
+}
+
+
+void genetics::lovemaking(network *mom, network *dad, network *daughter, network *son, double mutFactor, double crossOverFactor) {
+	double *genMom = mom->extractGenome(false);
+	int genMomSz = mom->genomeSize();
+	double *genDad = dad->extractGenome(false);
+	int genDadSz = dad->genomeSize();
+
+
+	if(genMomSz != genDadSz) {
+		int d = 0;
+		printf("This genetics don't gonna work");
+		d = 1/d;
+	}
+	
+	double *genChildDaughter = (double*) malloc (sizeof(double)*genMomSz);
+	double *genChildSon = (double*) malloc (sizeof(double)*genMomSz);
+	
+	bool condom = (RandomList::RandAB(0,1)>=crossOverFactor)?false:true;
+	if (!condom) {
+		int margeIn = 1;
+		int cutPlace = (int) RandomList::RandAB(margeIn,genMomSz-margeIn);
+
+		//printf("[%d] Cutting place %d\n",it,cutPlace);
+		for(int i = 0; i<genMomSz; i++){
+			if(i<cutPlace) {
+				genChildDaughter[i] = genMom[i];
+				genChildSon[i] = genDad[i];
+			} else {
+				genChildDaughter[i] = genDad[i];
+				genChildSon[i] = genMom[i];
+			}
+			//printf("Child [%d], %f\n",i,genChild[i]);
+		}
+	
+		// Mutate
+		for(int i = 0; i< genMomSz; i++){
+			double mutationProb = RandomList::RandAB(0,1);
+			if(mutationProb <= mutFactor) {
+				//genChildDaughter[i] = 1-genChildDaughter[i];
+				genChildDaughter[i] = (double)rand()/(double)(RAND_MAX/2.0)-1.0;
+				//printf("%d - prob %f - Applying new weight %1.5f\n",i,mutationProb,genChildDaughter[i]);
+			}
+			mutationProb = RandomList::RandAB(0,1);
+			if(mutationProb <= mutFactor) {
+				//genChildDaughter[i] = 1-genChildDaughter[i];
+				genChildDaughter[i] = (double)rand()/(double)(RAND_MAX/2.0)-1.0;
+				//printf("%d - prob %f - Applying new weight %1.5f\n",i,mutationProb,genChildDaughter[i]);
+			}
+		}
+		
+	} else {
+		// When no crossover copy mom and dad genome into childs
+		for(int i = 0; i<genMomSz; i++){
+			genChildSon[i] = genDad[i];
+			genChildDaughter[i] = genMom[i];
+		}
+	}
+	son->setGenome(genChildSon);
+	daughter->setGenome(genChildDaughter);
+	free(genChildSon);
+	free(genChildDaughter);
+	free(genMom);
+	free(genDad);
 }
 
 void genetics::step(void) {
@@ -1190,17 +1196,17 @@ int main(int argc, char* argv[]) {
 #elif defined (ASUPB)
 
 	// Create topology
-	int topo[2] = {4,1};
+	int topo[3] = {4,4,1};
 	
 	// Networks alloc
 	AsupB **n = (AsupB**) malloc(sizeof(AsupB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		n[i] = new AsupB(4,2,topo);
+		n[i] = new AsupB(4,3,topo);
 	}
 	
 	AsupB **cn = (AsupB**) malloc(sizeof(AsupB*)*nNetworks);
 	for(int i = 0; i<nNetworks; i++) {
-		cn[i] = new AsupB(4,2,topo);
+		cn[i] = new AsupB(4,3,topo);
 	}
 #elif defined (AORB)
 	#warning "AORB"
