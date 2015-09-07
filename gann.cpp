@@ -166,6 +166,9 @@ public:
 	int getGeneLen(void);
 	double *getGenes(void);
 	void setGenes(double *genes);
+	
+	// NEAT stuffs
+	void addConnexion(objectIO *neuron);
 };
 
 neuron::neuron(int s, objectIO **ios, double t) {
@@ -232,6 +235,26 @@ void neuron::setGenes(double *genes) {
 	memcpy(w,genes,sz*sizeof(double));
 }
 
+void neuron::addConnexion(objectIO *neuron) {
+	if (x != NULL && w != NULL) {
+		x = (objectIO**) realloc (x, sizeof(objectIO*) * (sz+1));
+		if (x != NULL) {
+			x[sz] = neuron;
+		} else {printf("Neuron::addConnexion realloc of x failed\n");}
+		w = (double*) realloc (w, sizeof(double) * (sz+1));
+		if (w != NULL) {
+			w[(int)sz] = (double)rand()/(double)(RAND_MAX/2.0)-1.0;;
+		} else {printf("Neuron::addConnexion realloc of w failed\n");}
+		sz += 1;
+	} else {
+		// neuron is not connected to any neuron yet
+		sz = 1;
+		x = (objectIO**) malloc (sizeof(objectIO*) * sz);
+		x[0] = neuron;
+		w = (double*) malloc (sizeof(double) * sz);
+		randomiseWeight();
+	}	
+}
 //====================================================
 
 class network {
@@ -263,6 +286,9 @@ public:
 	int genomeSize(void);
 	double *extractGenome(bool print);
 	void setGenome(double* g);
+	
+	//NEAT stuffs
+	void insertNewNeuron(void);
 };
 
 network::network(int nL, int *nPL) {
@@ -291,6 +317,39 @@ network::network(int nL, int *nPL) {
 		}
 		nPrevLayer = nPerLayer[i];
 	}
+}
+
+void network::insertNewNeuron(void) {
+	int targetLayer = (int) RandomList::RandAB(1,nLayers-1);
+	neurons[targetLayer] = (neuron**) realloc(neurons[targetLayer],sizeof(neuron*)*(nPerLayer[targetLayer]+1));
+	
+	// neuron birth, with no connexion
+	neurons[targetLayer][nPerLayer[targetLayer]] = new neuron(0,NULL);
+	// connexion with upstream layers
+	int nMaxConnex = 0;
+	for (int i = 0; i < targetLayer; i++) {
+		nMaxConnex += nPerLayer[i];
+	}
+	int nbConnexions = (int) RandomList::RandAB(1,nMaxConnex);
+	for (int i = 0; i<nbConnexions ; i++) {
+		int layer = (int) RandomList::RandAB(0,targetLayer-1);
+		int neuron = (int) RandomList::RandAB(0,nPerLayer[layer]);
+		neurons[targetLayer][nPerLayer[targetLayer]]->addConnexion((objectIO*) neurons[layer][neuron]);
+	} 
+	
+	// connexion with downstream layers
+	nMaxConnex = 0;
+	for (int i = targetLayer+1; i < nLayers; i++) {
+		nMaxConnex += nPerLayer[i];
+	}
+	nbConnexions = (int) RandomList::RandAB(1,nMaxConnex);
+	for (int i = 0; i<nbConnexions ; i++) {
+		int layer = (int) RandomList::RandAB(targetLayer+1,nLayers);
+		int neuron = (int) RandomList::RandAB(0,nPerLayer[layer]);
+		neurons[layer][neuron]->addConnexion((objectIO*) neurons[targetLayer][nPerLayer[targetLayer]]);
+	}
+	
+	nPerLayer[targetLayer]++;
 }
 
 void network::step(void) {
@@ -1108,10 +1167,10 @@ int main(int argc, char* argv[]) {
 	biasWheelTest();
 #else
 
-//#define AANDB
+// #define AANDB
 //#define AORB
-//#define ASUPB
-//#define AEQUALB
+#define ASUPB
+// #define AEQUALB
 
 #if defined(AANDB)
 
@@ -1144,7 +1203,7 @@ int main(int argc, char* argv[]) {
 		cn[i] = new AsupB(4,2,topo);
 	}
 #elif defined (AORB)
-
+	#warning "AORB"
 	// Create topology
 	int topo[2] = {4,1};
 	
@@ -1160,6 +1219,7 @@ int main(int argc, char* argv[]) {
 	}
 #elif defined (AEQUALB)
 
+	#warning "EQUALB"
 	// Create topology
 	int topo[3] = {4,2,1};
 	
@@ -1174,8 +1234,6 @@ int main(int argc, char* argv[]) {
 		cn[i] = new AequalB(2,topo);
 	}
 	
-#else
-	#error PROBLEM IS NOT DEFINED
 #endif
 
 	genetics gen = genetics(nNetworks,(network**)n,(network**)cn);
