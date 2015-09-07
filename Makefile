@@ -21,12 +21,11 @@ TOOL =
 GPP = $(TOOL)g++
 BIN = gann
 SRC = gann.cpp
-CFLAGS =
 LDFLAGS = -lm
 
-all:
-	@$(GPP) $(CFLAGS) $(SRC) -o $(BIN) $(LDFLAGS)
-	@echo ... BUILD DONE ...
+%:
+	@$(GPP) $(SRC) -o $(BIN) $(LDFLAGS) -D$@
+	@echo ... $@ BUILD DONE ...
 	
 clean:
 	@rm -f $(BIN)

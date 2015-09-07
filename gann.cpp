@@ -1111,7 +1111,7 @@ int main(int argc, char* argv[]) {
 //#define AANDB
 //#define AORB
 //#define ASUPB
-#define AEQUALB
+//#define AEQUALB
 
 #if defined(AANDB)
 
@@ -1144,7 +1144,7 @@ int main(int argc, char* argv[]) {
 		cn[i] = new AsupB(4,2,topo);
 	}
 #elif defined (AORB)
-	#warning "AORB"
+
 	// Create topology
 	int topo[2] = {4,1};
 	
@@ -1160,7 +1160,6 @@ int main(int argc, char* argv[]) {
 	}
 #elif defined (AEQUALB)
 
-	#warning "EQUALB"
 	// Create topology
 	int topo[3] = {4,2,1};
 	
@@ -1175,6 +1174,8 @@ int main(int argc, char* argv[]) {
 		cn[i] = new AequalB(2,topo);
 	}
 	
+#else
+	#error PROBLEM IS NOT DEFINED
 #endif
 
 	genetics gen = genetics(nNetworks,(network**)n,(network**)cn);
