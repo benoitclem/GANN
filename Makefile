@@ -26,7 +26,10 @@ LDFLAGS = -lm
 %:
 	@$(GPP) $(SRC) -o $(BIN) $(LDFLAGS) -D$@
 	@echo ... $@ BUILD DONE ...
-	
+
+all:
+	@echo "... PLEASE SPECIFY TARGET PROBLEM, PROGRAM NOT BUILD ...	\n \t-AORB\n \t-AANDB\n \t-ASUPB\n \t-AEQUALB"
+
 clean:
 	@rm -f $(BIN)
 	@echo ... CLEAN DONE ...
