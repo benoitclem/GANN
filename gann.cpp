@@ -1174,7 +1174,7 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	
-	// srand(time(NULL));
+	srand(time(NULL));
 	printf("neuronal network\n");
 	
 	// truncate file
