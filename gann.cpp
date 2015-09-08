@@ -74,7 +74,7 @@ int* RandomList::GetMixedArray(void) {
 
 class objectIO {
 public:
-	virtual double getOutput(void *arg) = 0;
+	virtual double getOutput(double in_date) = 0;
 };
 
 //====================================================
@@ -85,7 +85,7 @@ protected:
 public:
 	bit(double n);
 	virtual void setData(double n);
-	virtual double getOutput(void *arg);
+	virtual double getOutput(double in_date);
 };
 
 bit::bit(double n) {
@@ -96,7 +96,7 @@ void bit::setData(double n) {
 	v = n;
 }
 
-double bit::getOutput(void *arg) {
+double bit::getOutput(double in_date) {
 	return v;
 }
 
@@ -155,14 +155,16 @@ protected:
 	double thr;
 	double *w;
 	objectIO **x;
+	double date;
+	double output;
 public:
 	neuron(int sz, objectIO **ios, double t = 0);
 	void allocWeights(int sz);
 	void setIOs(objectIO **ios);
 	void randomiseWeight(void);
-	double evaluate(void); // need to be as fast as possible
+	double evaluate(double in_date);
 	void printState(void);
-	virtual double getOutput(void *arg);
+	virtual double getOutput(double in_date); // need to be as fast as possible
 	int getGeneLen(void);
 	double *getGenes(void);
 	void setGenes(double *genes);
@@ -175,6 +177,8 @@ neuron::neuron(int s, objectIO **ios, double t) {
 	x = ios;
 	allocWeights(s);
 	randomiseWeight();
+	date = 0;
+	output = 0;
 	
 	// Threshold
 	if(t == 0)
@@ -205,11 +209,13 @@ void neuron::randomiseWeight(void) {
 	}
 }
 
-double neuron::evaluate(void) {
+double neuron::evaluate(double in_date) {
 	sum = 0;
 	for(int i = 0; i < sz; i++)
-			sum += w[i]*(x[i]->getOutput(NULL));
-	return 1.0/(1.0+exp(-sum));
+			sum += w[i]*(x[i]->getOutput(in_date));
+	date = in_date;
+	output = 1.0/(1.0+exp(-sum));
+	return output;
 }
 
 void neuron:: printState(void) {
@@ -219,8 +225,11 @@ void neuron:: printState(void) {
 	printf("]\n");
 }
 
-double neuron::getOutput(void *arg) {
-	return evaluate();
+double neuron::getOutput(double in_date) {
+	if (in_date <= date)
+		return output;
+	else 
+		return evaluate(in_date);
 }
 
 int neuron::getGeneLen(void) {
@@ -263,6 +272,7 @@ protected:
 	int *nPerLayer;
 	int genomeSz;
 	neuron ***neurons;
+	double network_date;
 public:
 
 	// Construtor
@@ -292,6 +302,7 @@ public:
 };
 
 network::network(int nL, int *nPL) {
+	network_date = 0;
 	genomeSz = 0;
 	nLayers = nL;
 	nPerLayer = (int*) malloc(sizeof(int)*nLayers);
@@ -355,9 +366,10 @@ void network::insertNewNeuron(void) {
 
 
 void network::step(void) {
+	network_date++;
 	for(int i = 0; i<nLayers; i++) {
 		for(int j = 0; j<nPerLayer[i]; j++) {
-			neurons[i][j]->evaluate();
+			neurons[i][j]->evaluate(network_date);
 		}	
 	}
 }
@@ -1162,7 +1174,7 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	
-	srand(time(NULL));
+	// srand(time(NULL));
 	printf("neuronal network\n");
 	
 	// truncate file
@@ -1244,6 +1256,7 @@ int main(int argc, char* argv[]) {
 
 	genetics gen = genetics(nNetworks,(network**)n,(network**)cn);
 	bool running = true;
+	time_t date_in = time(NULL);
 	while(running) {
 		gen.compete(competition);		
 		gen.sort();
@@ -1262,8 +1275,9 @@ int main(int argc, char* argv[]) {
 				running = false;
 		}
 	}
-	
+	time_t date_out = time(NULL);
 	n[0]->extractGenome(true);
+	printf("Temps execution boucle : %f\n",difftime(date_out,date_in));
 	
 #endif
 	return 0;
