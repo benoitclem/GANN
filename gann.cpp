@@ -25,9 +25,12 @@
 #include <string.h>
 #include <stdarg.h>
 
+//#include <SDL/SDL.h>
+
 //#define BIASWHEEL_STATS
 
 double f[5];
+double bestEver;
 
 //====================================================
 
@@ -214,7 +217,8 @@ double neuron::evaluate(double in_date) {
 	for(int i = 0; i < sz; i++)
 			sum += w[i]*(x[i]->getOutput(in_date));
 	date = in_date;
-	output = 1.0/(1.0+exp(-sum));
+	output = 1.0/(1.0+exp(-5*sum));
+	//output = 1.0/(1.0+exp(-sum));
 	return output;
 }
 
@@ -272,7 +276,7 @@ protected:
 	int *nPerLayer;
 	int genomeSz;
 	neuron ***neurons;
-	double network_date;
+	double networkDate;
 public:
 
 	// Construtor
@@ -302,7 +306,7 @@ public:
 };
 
 network::network(int nL, int *nPL) {
-	network_date = 0;
+	networkDate = 0;
 	genomeSz = 0;
 	nLayers = nL;
 	nPerLayer = (int*) malloc(sizeof(int)*nLayers);
@@ -364,12 +368,11 @@ void network::insertNewNeuron(void) {
 }
 
 
-
 void network::step(void) {
-	network_date++;
+	networkDate++;
 	for(int i = 0; i<nLayers; i++) {
 		for(int j = 0; j<nPerLayer[i]; j++) {
-			neurons[i][j]->evaluate(network_date);
+			neurons[i][j]->evaluate(networkDate);
 		}	
 	}
 }
@@ -384,10 +387,11 @@ void network::print(void) {
 }
 
 int network::output(double *f, int max) {
+	networkDate++;
 	int highestLayer = nLayers-1;
 	int nNeurons = (nPerLayer[highestLayer]<max)?nPerLayer[highestLayer]:max;
 	for(int i = 0; i < nNeurons ; i++) {
-		*(f+i) = neurons[highestLayer][i]->getOutput(NULL);
+		*(f+i) = neurons[highestLayer][i]->getOutput(networkDate);
 	}
 	return nNeurons;
 }
@@ -459,7 +463,8 @@ public:
 	void setB(int lb);
 	int getA(void);
 	int getB(void);
-	virtual double error(double res) = 0;
+	virtual double error(double res);
+	virtual bool trueResult() = 0;
 };
 
 booleanOperation::booleanOperation(int iSz, int nLayer, int *nPerLayer): network(nLayer, nPerLayer) {
@@ -532,19 +537,9 @@ int booleanOperation::getB(void){
 	return b;
 }
 
-//====================================================
-
-class AsupB: public booleanOperation {
-public:
-	AsupB(int iSz, int nLayer, int *nPerLayer);
-	virtual double error(double res);
-};
-
-AsupB::AsupB(int iSz, int nLayer, int *nPerLayer): booleanOperation(iSz,nLayer,nPerLayer) { }
-
-double AsupB::error(double res) {
-	
-	if(a>b) {	// true res is 1
+double booleanOperation::error(double res) {
+	bool tRes = trueResult();
+	if(tRes) {	// true res is 1
 		if(res <= 0.5){ // we fail do a big error
 			return 1.0; 	
 		} else {			// we do it right make a small error
@@ -557,32 +552,19 @@ double AsupB::error(double res) {
 			return 1.0;
 		}
 	}
-	
-	/*
-	if((a>b) && (res>0.5)) {
-		return 0.0;
-	} else if((a<=b) && (res<0.5)) {
-		return 0.0;
-	} else {
-		return 1.0;
-	}
-	*/
-	
-	/*
-	if(a>b) {	// true res is 1
-		if(res <= 0.5){ // we fail do a big error
-			return 1-res; 	
-		} else {			// we do it right make a small error
-			return res;
-		}
-	} else { // true res is 0
-		if(res <= 0.5){  // we do it right make a small error
-			return res; 
-		} else { // we fail do a big error
-			return 1-res;
-		}
-	}
-	*/
+}
+//====================================================
+
+class AsupB: public booleanOperation {
+public:
+	AsupB(int iSz, int nLayer, int *nPerLayer);
+	virtual bool trueResult();
+};
+
+AsupB::AsupB(int iSz, int nLayer, int *nPerLayer): booleanOperation(iSz,nLayer,nPerLayer) { }
+
+bool AsupB::trueResult() {
+	return a>b;
 }
 
 //====================================================
@@ -590,36 +572,13 @@ double AsupB::error(double res) {
 class AandB: public booleanOperation {
 public:
 	AandB(int nLayer, int *nPerLayer);
-	virtual double error(double res);
+	virtual bool trueResult();
 };
 
 AandB::AandB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer) { }
 
-double AandB::error(double res) {
-	int result = a & b;
-	
-	if(result == 1){
-		if(res>=0.5)
-			return 0.0;
-		else
-			return 1.0;
-	} else {
-		if(res<0.5)
-			return 0.0;
-		else
-			return 1.0;
-	}
-
-	/*
-	//printf("%d %d - %d ",a,b,result);
-	if(result == 1){
-		//printf("- %f\n",result - res);
-		return result - res;
-	} else {
-		//printf("- %f\n",res);
-		return res;
-	}
-	*/
+bool AandB::trueResult() {
+	return a & b;
 }
 
 //====================================================
@@ -627,26 +586,27 @@ double AandB::error(double res) {
 class AorB: public booleanOperation {
 public:
 	AorB(int nLayer, int *nPerLayer);
-	virtual double error(double res);
+	virtual bool trueResult();
 };
 
 AorB::AorB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer) { }
 
-double AorB::error(double res) {
-	int result = a | b;
-	
-	if(result == 1){
-		if(res>=0.5)
-			return 0.0;
-		else
-			return 1.0;
-	} else {
-		if(res<0.5)
-			return 0.0;
-		else
-			return 1.0;
-	}
+bool AorB::trueResult() {
+	return a | b;
+}
 
+//====================================================
+
+class AxorB: public booleanOperation {
+public:
+	AxorB(int nLayer, int *nPerLayer);
+	virtual bool trueResult();
+};
+
+AxorB::AxorB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer) { }
+
+bool AxorB::trueResult() {
+	return a ^ b;
 }
 
 //====================================================
@@ -655,12 +615,12 @@ class AequalB: public booleanOperation {
 public:
 	AequalB(int nLayer, int *nPerLayer);
 	virtual double error(double res);
+	virtual bool trueResult() {return false;};
 };
 
 AequalB::AequalB(int nLayer, int *nPerLayer): booleanOperation(4,nLayer,nPerLayer) { }
 
 double AequalB::error(double res) {
-	
 	if(a == b){
 		//printf("Equal\n");
 		if((res<=0.6) && (res >= 0.4)) {
@@ -915,7 +875,9 @@ void genetics::sort(void) {
 	*/
 	fprintf(f,"\n");
 	popMean /= nNets;
-	printf("PopMean - %f\t MinErr - %1.6f\n",popMean,meanErr[0]);
+	if(meanErr[0]<bestEver)
+		bestEver = meanErr[0];
+	printf("PopMean - %f\t MinErr - %1.6f/%1.6f\n",popMean,meanErr[0],bestEver);
 	free(sortedNets);
 	free(sortedMeanErr);
 	free(sorted);
@@ -1129,6 +1091,18 @@ void biasWheelTest() {
 
 //====================================================
 
+/*
+int main(int argc, char* args[])
+{
+    //Start SDL
+    SDL_Init(SDL_INIT_EVERYTHING);
+
+    //Quit SDL
+    SDL_Quit();
+
+    return 0;
+}*/
+
 int main(int argc, char* argv[]) {
 
 	int nNetworks = 1000;
@@ -1138,7 +1112,7 @@ int main(int argc, char* argv[]) {
 	double mutFactor = 0.001;
 	double crossOverFactor = 0.7;
 	int nCpy	= 10;
-	
+	bestEver = 100.0;
 
 	if(argc == 8) {
 		for(int i = 1; i<argc; i++) {
@@ -1186,8 +1160,8 @@ int main(int argc, char* argv[]) {
 #else
 
 // #define AANDB
-//#define AORB
-#define ASUPB
+// #define AORB
+// #define ASUPB
 // #define AEQUALB
 
 #if defined(AANDB)
@@ -1208,7 +1182,7 @@ int main(int argc, char* argv[]) {
 #elif defined (ASUPB)
 
 	// Create topology
-	int topo[3] = {4,4,1};
+	int topo[3] = {4,2,1};
 	
 	// Networks alloc
 	AsupB **n = (AsupB**) malloc(sizeof(AsupB*)*nNetworks);
@@ -1221,7 +1195,6 @@ int main(int argc, char* argv[]) {
 		cn[i] = new AsupB(4,3,topo);
 	}
 #elif defined (AORB)
-	#warning "AORB"
 	// Create topology
 	int topo[2] = {4,1};
 	
@@ -1235,6 +1208,23 @@ int main(int argc, char* argv[]) {
 	for(int i = 0; i<nNetworks; i++) {
 		cn[i] = new AorB(2,topo);
 	}
+	
+#elif defined (AXORB)
+	// Create topology
+	#define NLAYER		3
+	int topo[NLAYER] = {4,3,1};
+	
+	// Networks alloc
+	AxorB **n = (AxorB**) malloc(sizeof(AxorB*)*nNetworks);
+	for(int i = 0; i<nNetworks; i++) {
+		n[i] = new AxorB(NLAYER,topo);
+	}
+	
+	AxorB **cn = (AxorB**) malloc(sizeof(AxorB*)*nNetworks);
+	for(int i = 0; i<nNetworks; i++) {
+		cn[i] = new AxorB(NLAYER,topo);
+	}
+	
 #elif defined (AEQUALB)
 
 	#warning "EQUALB"
@@ -1257,23 +1247,30 @@ int main(int argc, char* argv[]) {
 	genetics gen = genetics(nNetworks,(network**)n,(network**)cn);
 	bool running = true;
 	time_t date_in = time(NULL);
+	double bestEver = 1000.0;
 	while(running) {
 		gen.compete(competition);		
 		gen.sort();
 		gen.select(chunk,nbiaisWheel,mutFactor,crossOverFactor);
 		double err[5];
 		//n[0]->extractGenome(true);
-		for(int i = 0 ; i<200; i++) {
+		double e = 0;
+		int nIt = 2000;
+		// Run competition to check if the best element can handle the problem
+		for(int i = 0 ; i<nIt; i++) {
 			void *data = n[0]->getInputData();
 			n[0]->setInputData(data);
-			n[0]->step();
+			//n[0]->step();
 			n[0]->output(err,1);
-			double e = n[0]->error(err[0]);
-			printf("%03d %03d %1.5f %1.5f\n",((booleanOperation*)n[0])->getA(),((booleanOperation*)n[0])->getB(),err[0],e);
+			double er = n[0]->error(err[0]);
+			e += er;
+			if((i%100)==0)
+				printf("%03d %03d %1.5f %1.5f\n",((booleanOperation*)n[0])->getA(),((booleanOperation*)n[0])->getB(),err[0],er);
 			free(data);
-			if(e == 0.0)
-				running = false;
+
 		}
+		if(e/nIt == 0.0)
+			running = false;
 	}
 	time_t date_out = time(NULL);
 	n[0]->extractGenome(true);

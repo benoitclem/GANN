@@ -21,14 +21,15 @@ TOOL =
 GPP = $(TOOL)g++
 BIN = gann
 SRC = gann.cpp
+LPATH = -L/opt/local/lib/
 LDFLAGS = -lm
 
 %:
-	@$(GPP) $(SRC) -o $(BIN) $(LDFLAGS) -D$@
+	@$(GPP) $(SRC) -o $(BIN) $(LPATH) $(LDFLAGS) -D$@
 	@echo ... $@ BUILD DONE ...
 
 all:
-	@echo "... PLEASE SPECIFY TARGET PROBLEM, PROGRAM NOT BUILD ...	\n \t-AORB\n \t-AANDB\n \t-ASUPB\n \t-AEQUALB"
+	@echo "... PLEASE SPECIFY TARGET PROBLEM, PROGRAM NOT BUILD ...	\n \t-AORB\n \t-AANDB\n \t-ASUPB\n \t-AXORB\n \t-AEQUALB"
 
 clean:
 	@rm -f $(BIN)
