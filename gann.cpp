@@ -154,6 +154,7 @@ bit **numInput::getBits(void) {
 class neuron: public objectIO {
 protected:
 	int sz;
+	int allSz;
 	double sum;
 	double thr;
 	double *w;
@@ -161,54 +162,69 @@ protected:
 	double date;
 	double output;
 public:
-	neuron(int sz, objectIO **ios, double t = 0);
-	void allocWeights(int sz);
-	void setIOs(objectIO **ios);
-	void randomiseWeight(void);
-	double evaluate(double in_date);
-	void printState(void);
+	neuron(objectIO **ios, int sz, double t = 0);
+	// Network creation stuffs
+	virtual void checkAllocatedAxones(int s);
+	virtual  void connectObject(objectIO *n, double weight = -99.99);
+	// Reset a neuron
+	virtual void randomiseWeight(void);
+	// Output stuffs
+	virtual double evaluate(double in_date);
 	virtual double getOutput(double in_date); // need to be as fast as possible
-	int getGeneLen(void);
-	double *getGenes(void);
-	void setGenes(double *genes);
-	
-	// NEAT stuffs
-	void addConnexion(objectIO *neuron);
+	// Genetics stuffs
+	virtual int getGeneLen(void);
+	virtual double *getGenes(void);
+	virtual void setGenes(double *genes);
+	// Debug stuffs
+	virtual void printState(void);
 };
 
-neuron::neuron(int s, objectIO **ios, double t) {
-	x = ios;
-	allocWeights(s);
-	randomiseWeight();
-	date = 0;
-	output = 0;
+neuron::neuron(objectIO **ios, int s, double t) {
+
+	// Set all Clean
+	x = NULL;
+	w = NULL;
+	sz = 0;
+	date = 0.0;
+	output = 0.0;
 	
-	// Threshold
+	// Random Threshold or value from constructor 
 	if(t == 0)
 		thr = (double)rand()/(double)(RAND_MAX/1.0);
 	else
 		thr = t;
-	/*for(int i = 0; i < sz; i++)
-			printf("input %1.4f\n",x[i]->getOutput(NULL));
-	*/
+	
+	// Links to Obj
+	if((s!=0) && (ios!=NULL)){
+		// Set Object Links
+		for(int i = 0; i<s; i++) {
+			connectObject(ios[i]);
+		}
+	}
 }
 
-void neuron::allocWeights(int s) {
-	sz = s;
-	if(sz != 0) 
-		w = (double*) malloc (sizeof(double) *sz);
-	else
-		w = NULL;
+void neuron::checkAllocatedAxones(int s) {
+	// Always alloc 2 times more memory that we actually need
+	if(s>allSz) {
+		allSz = s * 2;
+		// man tells us if x is NULL realloc(x,sz) = malloc(sz)
+		x = (objectIO**) realloc(x,sizeof(objectIO*)*allSz);
+		w = (double*) realloc (w,sizeof(double)*allSz);
+	}
 }
 
-void neuron::setIOs(objectIO **ios) {
-	x = ios;
+void neuron::connectObject(objectIO *n, double weight) {
+	// Check if the pointer can handle sz + 1;
+	checkAllocatedAxones(sz+1);
+	// Apply the connexion
+	x[sz] = n;
+	w[sz] = (weight == -99.99)?(double)rand()/(double)(RAND_MAX/2.0)-1.0:weight;
+	sz++;
 }
 
 void neuron::randomiseWeight(void) {
 	for(int i = 0; i < sz; i++) {
 		w[i] = (double)rand()/(double)(RAND_MAX/2.0)-1.0;
-		//printf("w[%d] %1.4f\n",i,w[i]);
 	}
 }
 
@@ -220,13 +236,6 @@ double neuron::evaluate(double in_date) {
 	output = 1.0/(1.0+exp(-5*sum));
 	//output = 1.0/(1.0+exp(-sum));
 	return output;
-}
-
-void neuron:: printState(void) {
-	printf("[%1.5f] [%1.5f] [",thr,sum);
-	for(int i = 0; i < sz; i++) 
-		printf(" %1.5f ",w[i]);
-	printf("]\n");
 }
 
 double neuron::getOutput(double in_date) {
@@ -248,26 +257,13 @@ void neuron::setGenes(double *genes) {
 	memcpy(w,genes,sz*sizeof(double));
 }
 
-void neuron::addConnexion(objectIO *neuron) {
-	if (x != NULL && w != NULL) {
-		x = (objectIO**) realloc (x, sizeof(objectIO*) * (sz+1));
-		if (x != NULL) {
-			x[sz] = neuron;
-		} else {printf("Neuron::addConnexion realloc of x failed\n");}
-		w = (double*) realloc (w, sizeof(double) * (sz+1));
-		if (w != NULL) {
-			w[(int)sz] = (double)rand()/(double)(RAND_MAX/2.0)-1.0;;
-		} else {printf("Neuron::addConnexion realloc of w failed\n");}
-		sz += 1;
-	} else {
-		// neuron is not connected to any neuron yet
-		sz = 1;
-		x = (objectIO**) malloc (sizeof(objectIO*) * sz);
-		x[0] = neuron;
-		w = (double*) malloc (sizeof(double) * sz);
-		randomiseWeight();
-	}	
+void neuron:: printState(void) {
+	printf("[%1.5f] [%1.5f] [%p] [",thr,sum,w);
+	for(int i = 0; i < sz; i++) 
+		printf(" %1.5f(%p) ",w[i],x[i]);
+	printf("]\n");
 }
+
 //====================================================
 
 class network {
@@ -302,7 +298,7 @@ public:
 	void setGenome(double* g);
 	
 	//NEAT stuffs
-	void insertNewNeuron(void);
+	//void insertNewNeuron(void);
 };
 
 network::network(int nL, int *nPL) {
@@ -327,13 +323,14 @@ network::network(int nL, int *nPL) {
 		}
 		
 		for(int j = 0; j<nPerLayer[i]; j++) {
-			neurons[i][j] = new neuron(nPrevLayer,list);
+			neurons[i][j] = new neuron(list,nPrevLayer);
 			//printf("Created Neuron[%d][%d] %p with nPrevLayer = %d, list %p\n", i, j, neurons[i][j], nPrevLayer, list);
 		}
 		nPrevLayer = nPerLayer[i];
 	}
 }
 
+/*
 void network::insertNewNeuron(void) {
 	int targetLayer = (int) RandomList::RandAB(1,nLayers-1);
 	neurons[targetLayer] = (neuron**) realloc(neurons[targetLayer],sizeof(neuron*)*(nPerLayer[targetLayer]+1));
@@ -366,6 +363,7 @@ void network::insertNewNeuron(void) {
 	
 	nPerLayer[targetLayer]++;
 }
+*/
 
 
 void network::step(void) {
@@ -485,17 +483,12 @@ booleanOperation::booleanOperation(int iSz, int nLayer, int *nPerLayer): network
 	// Here the network is created but none 
 	// of the input are connected so connect 
 	// first layer to our inputs
-	objectIO **list = (objectIO**) malloc(sizeof(objectIO*)*intSz*nInput);
 	for(int i = 0; i<intSz; i++) {
 		for(int j = 0; j<nInput; j++) {
-			list[i+(j*iSz)] = li[j]->getBit(i);
+			for(int k = 0; k<nPerLayer[0]; k++) {
+				neurons[0][k]->connectObject(li[j]->getBit(i));
+			}
 		}
-	}
-	for(int i = 0; i<nPerLayer[0]; i++) {
-		//printf("%d\n", i);
-		neurons[0][i]->allocWeights(intSz*nInput);
-		neurons[0][i]->randomiseWeight();
-		neurons[0][i]->setIOs(list);
 	}
 }
 
@@ -598,12 +591,18 @@ bool AorB::trueResult() {
 //====================================================
 
 class AxorB: public booleanOperation {
+private:
+	bit bias;
 public:
 	AxorB(int nLayer, int *nPerLayer);
 	virtual bool trueResult();
 };
 
-AxorB::AxorB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer) { }
+AxorB::AxorB(int nLayer, int *nPerLayer): booleanOperation(1,nLayer,nPerLayer), bias(1.0) {
+	neurons[0][0]->connectObject(&bias);
+	neurons[0][1]->connectObject(&bias);
+	neurons[1][0]->connectObject(&bias);
+}
 
 bool AxorB::trueResult() {
 	return a ^ b;
@@ -1211,8 +1210,8 @@ int main(int argc, char* argv[]) {
 	
 #elif defined (AXORB)
 	// Create topology
-	#define NLAYER		3
-	int topo[NLAYER] = {4,3,1};
+	#define NLAYER		2
+	int topo[NLAYER] = {2,1};
 	
 	// Networks alloc
 	AxorB **n = (AxorB**) malloc(sizeof(AxorB*)*nNetworks);
@@ -1243,6 +1242,8 @@ int main(int argc, char* argv[]) {
 	}
 	
 #endif
+
+	n[0]->print();
 
 	genetics gen = genetics(nNetworks,(network**)n,(network**)cn);
 	bool running = true;
